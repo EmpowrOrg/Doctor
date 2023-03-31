@@ -59,12 +59,20 @@ RUN apt-get update \
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
 
+# Install C# (DotNet SDK)
+RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+RUN dpkg -i packages-microsoft-prod.deb
+RUN rm packages-microsoft-prod.deb
+RUN apt-get update \
+    && apt-get install -y dotnet-sdk-7.0
+
 RUN kotlinc -version
 RUN python3 --version
 RUN java --version
 RUN node --version
 RUN swift --version
 RUN cargo --help
+RUN dotnet --info
 
 ENTRYPOINT ["java","-jar","/app/doctor.jar"]
 
