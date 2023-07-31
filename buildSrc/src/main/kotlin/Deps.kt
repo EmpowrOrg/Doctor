@@ -52,7 +52,7 @@ object Deps {
     }
 
     object Postgresql {
-        val main by lazy { "org.postgresql:postgresql:42.3.1" }
+        val main by lazy { "org.postgresql:postgresql:42.6.0" }
     }
 
     object Models {
@@ -65,7 +65,7 @@ object Deps {
     }
 
     object Kotlin {
-        val coroutines by lazy { "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2" }
+        val coroutines by lazy { "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3" }
         val dateTime by lazy { "org.jetbrains.kotlinx:kotlinx-datetime:0.4.0" }
     }
 
