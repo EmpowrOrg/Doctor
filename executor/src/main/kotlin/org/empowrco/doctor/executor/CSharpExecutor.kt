@@ -56,9 +56,10 @@ class CSharpExecutor(private val commander: Commander, private val fileUtil: Fil
                         ?: return@withContext Error("Unit tests were not wrapped in a valid class")
                 val namespaceRegex = "namespace\\s(.*);".toRegex()
                 val namespace = namespaceRegex.find(unitTests)?.groupValues?.lastOrNull()
-                    ?: namespaceRegex.find(code)?.groupValues?.lastOrNull() ?: "XunitTesting"
-                val createTestResult =
-                    commander.execute("dotnet new xunit -n $namespace", tempFolder)
+                    ?: namespaceRegex.find(code)?.groupValues?.lastOrNull() ?: "NunitTesting"
+                val tester = Tester.values().find { it.regexMatcher.containsMatchIn(unitTests) }?.command
+                    ?: return@withContext Error("No matching tester. Please use either Nunit or Xunit for your unit tests")
+                val createTestResult = commander.execute("dotnet new $tester -n $namespace", tempFolder)
                 val testFolder = File(tempFolder, "/$namespace")
                 val codeFile = testFolder.listFiles()?.firstOrNull {
                     it.name.contains("Usings", ignoreCase = true) && it.name.endsWith(
@@ -98,4 +99,8 @@ class CSharpExecutor(private val commander: Commander, private val fileUtil: Fil
             }
         }
     }
+}
+
+private enum class Tester(val regexMatcher: Regex, val command: String) {
+    Nunit("(?<=\\[)(Test)(?=])".toRegex(), "nunit"), Xunit("(?<=\\[)(Fact)(?=])".toRegex(), "xunit"),
 }
