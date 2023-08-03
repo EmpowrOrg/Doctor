@@ -19,20 +19,12 @@ class CSharpExecutor(private val commander: Commander, private val fileUtil: Fil
         return withContext(Dispatchers.IO) {
             return@withContext try {
                 val tempFile = fileUtil.writeToFile("c-sharp-exc", ".cs") {
-                    it.appendLine("using System;")
-                    it.appendLine()
-                    it.appendLine("public class Temp")
-                    it.appendLine("{")
-                    it.appendLine("    public static void Main(string[] args)")
-                    it.appendLine("    {")
                     it.appendLine(code)
-                    it.appendLine("    }")
-                    it.appendLine("}")
                 }
                 val compileResult = commander.execute("csc ${tempFile.absolutePath}")
                 tempFile.deleteRecursively()
-                if (compileResult is CommandResponse.Error) {
-                    Success(compileResult.output, compileResult is CommandResponse.Error)
+                if (compileResult is CommandResponse.Error || hasOutputError(compileResult.output)) {
+                    Success(compileResult.output, true)
                 } else {
                     val path = System.getProperty("user.dir").plus("/${tempFile.name.replace(".cs", ".exe")}")
                     val result = commander.execute("mono $path")
@@ -46,6 +38,10 @@ class CSharpExecutor(private val commander: Commander, private val fileUtil: Fil
         }
     }
 
+    private fun hasOutputError(output: String): Boolean {
+        return ".cs\\((\\d).*,(\\d.*)\\):\\serror".toRegex().containsMatchIn(output)
+    }
+
     override suspend fun test(code: String, unitTests: String): ExecutorResponse {
         return withContext(Dispatchers.IO) {
             val tempFolder = fileUtil.createTempDirectory()
@@ -56,10 +52,14 @@ class CSharpExecutor(private val commander: Commander, private val fileUtil: Fil
                         ?: return@withContext Error("Unit tests were not wrapped in a valid class")
                 val namespaceRegex = "namespace\\s(.*);".toRegex()
                 val namespace = namespaceRegex.find(unitTests)?.groupValues?.lastOrNull()
-                    ?: namespaceRegex.find(code)?.groupValues?.lastOrNull() ?: "NunitTesting"
-                val tester = Tester.values().find { it.regexMatcher.containsMatchIn(unitTests) }?.command
+                    ?: namespaceRegex.find(code)?.groupValues?.lastOrNull() ?: "UnitTesting"
+                val tester = Tester.values()
+                    .find { it.regexMatcher.containsMatchIn(unitTests) || it.regexMatcher.containsMatchIn(code) }?.command
                     ?: return@withContext Error("No matching tester. Please use either Nunit or Xunit for your unit tests")
                 val createTestResult = commander.execute("dotnet new $tester -n $namespace", tempFolder)
+                if (createTestResult is CommandResponse.Error) {
+                    return@withContext Error(createTestResult.output)
+                }
                 val testFolder = File(tempFolder, "/$namespace")
                 val codeFile = testFolder.listFiles()?.firstOrNull {
                     it.name.contains("Usings", ignoreCase = true) && it.name.endsWith(
@@ -83,12 +83,9 @@ class CSharpExecutor(private val commander: Commander, private val fileUtil: Fil
                     it.write("")
                     it.write(unitTests)
                 }
-                if (createTestResult is CommandResponse.Error) {
-                    return@withContext Error(createTestResult.output)
-                }
                 val executeTestResult = commander.execute("dotnet test", testFolder)
                 if (executeTestResult is CommandResponse.Success) {
-                    return@withContext Success(executeTestResult.output, false)
+                    return@withContext Success(executeTestResult.output, hasOutputError(executeTestResult.output))
                 } else {
                     return@withContext Error(executeTestResult.output)
                 }
