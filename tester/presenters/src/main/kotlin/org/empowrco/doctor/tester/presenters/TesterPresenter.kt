@@ -27,6 +27,11 @@ internal class RealTesterPresenter(
             is Success -> {
                 ExecuteTestsResponse(
                     output = result.output,
+                    success = if (result.isStacktraceError) {
+                        false
+                    } else {
+                        null
+                    },
                 )
             }
 
